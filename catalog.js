@@ -181,7 +181,8 @@ window.selectCatalogColor=function(btn){
   if(photo){
     const src=exact||family||image({id});
     photo.src=src;
-    photo.style.objectPosition=exact?'50%':colorPositionFor(id,color)+' center';
+    photo.style.objectPosition='50% center';
+    photo.style.transform='none';
     photo.onerror=function(){ this.onerror=null; this.src=image({id}); };
   }
 
