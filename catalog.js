@@ -182,6 +182,7 @@ window.selectCatalogColor=function(btn){
     photo.src=colorDisplayFor(id,color);
     photo.style.objectPosition='50% center';
     photo.style.transform='none';
+    photo.style.transition='none';
     photo.onerror=function(){ this.onerror=null; this.src=`assets/products/${id}-front.svg`; };
   }
   const productLink=`produto.html?id=${encodeURIComponent(id)}&color=${encodeURIComponent(color)}`;
