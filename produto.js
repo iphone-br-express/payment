@@ -12,6 +12,8 @@ async function api(path){const ctl=new AbortController();const timer=setTimeout(
 function esc(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function colorPositionFor(id,color){const order=(window.COLOR_IMAGE_ORDER&&window.COLOR_IMAGE_ORDER[id])||[];const idx=order.indexOf(color);const total=order.length||((window.PRODUCT_COLORS&&window.PRODUCT_COLORS[id])||[]).length||1;return idx<0||total<=1?'50%':`${Math.round((idx/(total-1))*100)}%`;}
 function colorPhotoFor(id,color){return (window.COLOR_PHOTOS&&window.COLOR_PHOTOS[id]&&window.COLOR_PHOTOS[id][color])||null;}
+function colorVariantFor(id,color){const safe=String(color||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); return `assets/products/colors/${id}-${safe}.svg`;}
+function colorDisplayFor(id,color){return colorPhotoFor(id,color)||colorVariantFor(id,color);}
 function colorHex(c){const x=c.toLowerCase();if(x.includes('rosa'))return '#f3b5c7';if(x.includes('azul'))return '#5c82c9';if(x.includes('verde'))return '#8eaf9c';if(x.includes('roxo')||x.includes('lavanda'))return '#9c8bc4';if(x.includes('amarelo')||x.includes('dourado'))return '#d9bb67';if(x.includes('branco')||x.includes('prateado')||x.includes('estelar')||x.includes('glacial'))return '#f4f4f0';if(x.includes('vermelho')||x.includes('red'))return '#c8102e';if(x.includes('preto')||x.includes('grafite')||x.includes('espacial'))return '#222';if(x.includes('laranja'))return '#e56a22';if(x.includes('bordô'))return '#6b2737';return '#888';}
 window.addEventListener('DOMContentLoaded', function(){
  try {
@@ -28,10 +30,10 @@ window.addEventListener('DOMContentLoaded', function(){
   const imgs=(gallery(p)||[]).filter(Boolean).slice(0,3), cs=colors(p);
   const fallback=`assets/products/${p.id}-front.svg`;
   let selected=cs.includes(requestedColor)?requestedColor:cs[0];
-  const colorPhotos=(window.COLOR_PHOTOS&&window.COLOR_PHOTOS[p.id])||{}; const firstImg=colorPhotos[selected]||imgs[0]||fallback;
+  const firstImg=colorDisplayFor(p.id,selected)||imgs[0]||fallback;
   $("detail").innerHTML=`
    <div class="gallery">
-    <div class="main-photo"><span class="sale big">30% OFF</span><div id="mainImage" class="main-color-photo" style="--photo-image:url("${esc(firstImg)}");--photo-position:50%;--color-count:${cs.length};" role="img" aria-label="${esc(p.name)} ${esc(p.storage)}"></div></div>
+    <div class="main-photo"><span class="sale big">30% OFF</span><img id="mainImage" class="main-product-img" src="${esc(firstImg)}" alt="${esc(p.name)} ${esc(selected)}" onerror="this.onerror=null;this.src='${fallback}'"></div>
     <div class="photo-source">Fotos reais/de referência do modelo. A disponibilidade da cor é confirmada antes do envio.</div>
     <div class="thumbs">${imgs.map((src,i)=>`<button class="photo-thumb ${i===0?'active':''}" data-src="${esc(src)}" type="button"><span>${['Foto principal','Traseira','Outra vista'][i]}</span><img src="${esc(src)}" alt="${esc(p.name)}"></button>`).join('')}</div>
    </div>
