@@ -115,8 +115,8 @@ window.PRODUCT_COLORS = {
 "iphone-13-mini-128":["Meia-noite","Estelar","Azul","Rosa","Verde","(PRODUCT)RED"],
 "iphone-13-pro-128":["Grafite","Dourado","Prateado","Azul-serra","Verde-alpino"],
 "iphone-13-pro-max-128":["Grafite","Dourado","Prateado","Azul-serra","Verde-alpino"],
-"iphone-14-128":["Meia-noite","Estelar","Azul","Roxo","(PRODUCT)RED"],
-"iphone-14-plus-128":["Meia-noite","Estelar","Azul","Roxo","(PRODUCT)RED"],
+"iphone-14-128":["Meia-noite","Estelar","Azul","Roxo","(PRODUCT)RED","Amarelo"],
+"iphone-14-plus-128":["Meia-noite","Estelar","Azul","Roxo","(PRODUCT)RED","Amarelo"],
 "iphone-14-pro-128":["Preto-espacial","Prateado","Dourado","Roxo-profundo"],
 "iphone-14-pro-max-128":["Preto-espacial","Prateado","Dourado","Roxo-profundo"],
 "iphone-15-128":["Preto","Azul","Verde","Amarelo","Rosa"],
@@ -158,7 +158,14 @@ function image(p){return `assets/products/${p.id}-front.svg`;}
 function familyImage(p){return window.FAMILY_PHOTOS[p.id]||window.REAL_PHOTOS[p.id]||image(p);}
 function productImage(p){return familyImage(p);}
 function galleryFor(p){return (window.REAL_GALLERIES&&window.REAL_GALLERIES[p.id])||[familyImage(p)];}
-function colorPosition(index,total){ if(total<=1)return '50%'; return `${Math.round((index/(total-1))*100)}%`; }
+function colorPositionFor(id,color){
+  const order=(window.COLOR_IMAGE_ORDER&&window.COLOR_IMAGE_ORDER[id])||[];
+  const idx=order.indexOf(color);
+  const total=order.length||((window.PRODUCT_COLORS&&window.PRODUCT_COLORS[id])||[]).length||1;
+  if(idx<0||total<=1)return '50%';
+  return `${Math.round((idx/(total-1))*100)}%`;
+}
+function colorPhotoFor(id,color){return (window.COLOR_PHOTOS&&window.COLOR_PHOTOS[id]&&window.COLOR_PHOTOS[id][color])||null;}
 function colorButtons(p){
   const colors=(window.PRODUCT_COLORS&&window.PRODUCT_COLORS[p.id])||[];
   if(!colors.length) return '';
@@ -170,8 +177,9 @@ window.selectCatalogColor=function(btn){
   const color=btn.dataset.color; box.querySelector('.selected-color').textContent=color;
   const id=box.dataset.product; const photo=card.querySelector('.catalog-photo');
   const family=(window.FAMILY_PHOTOS&&window.FAMILY_PHOTOS[id])||(window.REAL_PHOTOS&&window.REAL_PHOTOS[id]);
-  const idx=Number(btn.dataset.index)||0, total=Number(box.dataset.count)||1;
-  if(photo&&family){photo.style.setProperty('--photo-image',`url("${family.replaceAll('"','%22')}")`); photo.style.setProperty('--photo-position',total<=1?'50%':`${Math.round((idx/(total-1))*100)}%`); photo.style.setProperty('--color-count',total);}
+  const exact=colorPhotoFor(id,color); const total=Number(box.dataset.count)||1;
+  if(photo){photo.style.setProperty('--photo-image',`url("${(exact||family||image({id})).replaceAll('"','%22')}")`); photo.style.setProperty('--photo-position',exact?'50%':colorPositionFor(id,color)); photo.style.setProperty('--color-count',exact?'1':total);}
+
   const buy=card.querySelector('.buy'); if(buy){buy.href=`produto.html?id=${encodeURIComponent(id)}&color=${encodeURIComponent(color)}`;}
 };
 function selectCatalogColor(btn){ window.selectCatalogColor(btn); }
@@ -180,7 +188,7 @@ function render(list){
   const grid=document.getElementById('products');
   if(!list.length){grid.innerHTML='<div class="empty">Nenhum iPhone encontrado.</div>';document.getElementById('count').textContent='0 modelos';return;}
   document.getElementById('count').textContent=`${list.length} opções`;
-  grid.innerHTML=list.map(p=>{const g=galleryFor(p);return `<article class="product-card" data-product-id="${p.id}"><a class="product-image" href="produto.html?id=${encodeURIComponent(p.id)}&color=${encodeURIComponent(((window.PRODUCT_COLORS&&window.PRODUCT_COLORS[p.id])||[])[0]||'')}"><span class="sale">30% OFF</span><div class="catalog-photo" style="--photo-image:url("${productImage(p)}");--photo-position:0%;--color-count:${((window.PRODUCT_COLORS&&window.PRODUCT_COLORS[p.id])||[]).length||1};" role="img" aria-label="${p.name} ${p.storage}"></div></a><div class="product-info"><h3>${p.name}</h3><p class="storage">${p.storage}</p><div class="trust-badges"><span>✓ NOVO</span><span>✓ TESTADO</span></div>${colorButtons(p)}<div class="old">De ${money(p.referencePrice)}</div><div class="price">${money(p.price)}</div><div class="shipping">Frete grátis • Full até 7 dias úteis</div><div class="mini-gallery">${g.slice(0,3).map(src=>`<img src="${src}" alt="${p.name}" loading="lazy" onerror="this.style.display='none'">`).join('')}</div><a class="buy" href="produto.html?id=${encodeURIComponent(p.id)}&color=${encodeURIComponent(((window.PRODUCT_COLORS&&window.PRODUCT_COLORS[p.id])||[])[0]||'')}">Ver produto</a></div></article>`;}).join('');
+  grid.innerHTML=list.map(p=>{const g=galleryFor(p); const defaultColor=((window.PRODUCT_COLORS&&window.PRODUCT_COLORS[p.id])||[])[0]||''; const defaultPhoto=colorPhotoFor(p.id,defaultColor)||productImage(p); const defaultPos=colorPhotoFor(p.id,defaultColor)?'50%':colorPositionFor(p.id,defaultColor); const defaultCount=colorPhotoFor(p.id,defaultColor)?1:((window.COLOR_IMAGE_ORDER&&window.COLOR_IMAGE_ORDER[p.id])||[]).length||((window.PRODUCT_COLORS&&window.PRODUCT_COLORS[p.id])||[]).length||1;return `<article class="product-card" data-product-id="${p.id}"><a class="product-image" href="produto.html?id=${encodeURIComponent(p.id)}&color=${encodeURIComponent(((window.PRODUCT_COLORS&&window.PRODUCT_COLORS[p.id])||[])[0]||'')}"><span class="sale">30% OFF</span><div class="catalog-photo" style="--photo-image:url("${defaultPhoto}");--photo-position:${defaultPos};--color-count:${defaultCount};" role="img" aria-label="${p.name} ${p.storage}"></div></a><div class="product-info"><h3>${p.name}</h3><p class="storage">${p.storage}</p><div class="trust-badges"><span>✓ NOVO</span><span>✓ TESTADO</span></div>${colorButtons(p)}<div class="old">De ${money(p.referencePrice)}</div><div class="price">${money(p.price)}</div><div class="shipping">Frete grátis • Full até 7 dias úteis</div><div class="mini-gallery">${g.slice(0,3).map(src=>`<img src="${src}" alt="${p.name}" loading="lazy" onerror="this.style.display='none'">`).join('')}</div><a class="buy" href="produto.html?id=${encodeURIComponent(p.id)}&color=${encodeURIComponent(((window.PRODUCT_COLORS&&window.PRODUCT_COLORS[p.id])||[])[0]||'')}">Ver produto</a></div></article>`;}).join('');
 }
 document.getElementById('search').addEventListener('input',e=>{const q=e.target.value.trim().toLowerCase();render(products.filter(p=>`${p.name} ${p.storage}`.toLowerCase().includes(q)));});
 async function loadCatalog(){const ctl=new AbortController();const timer=setTimeout(()=>ctl.abort(),6000);try{const r=await fetch(API_BASE_URL+'/api/products',{cache:'no-store',signal:ctl.signal});const d=await r.json();if(!r.ok)throw new Error(d.message||`HTTP ${r.status}`);if(Array.isArray(d.products)&&d.products.length)products=d.products;}catch(e){document.getElementById('catalogStatus').textContent='Catálogo local carregado. O servidor de pagamento continua conectado.';}finally{clearTimeout(timer);render(products);}}
