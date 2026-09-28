@@ -13,7 +13,7 @@ function esc(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;',
 function colorPositionFor(id,color){const order=(window.COLOR_IMAGE_ORDER&&window.COLOR_IMAGE_ORDER[id])||[];const idx=order.indexOf(color);const total=order.length||((window.PRODUCT_COLORS&&window.PRODUCT_COLORS[id])||[]).length||1;return idx<0||total<=1?'50%':`${Math.round((idx/(total-1))*100)}%`;}
 function colorPhotoFor(id,color){return (window.COLOR_PHOTOS&&window.COLOR_PHOTOS[id]&&window.COLOR_PHOTOS[id][color])||null;}
 function colorVariantFor(id,color){const safe=String(color||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); return `assets/products/colors/${id}-${safe}.svg`;}
-function colorDisplayFor(id,color){return colorPhotoFor(id,color)||colorVariantFor(id,color);}
+function colorDisplayFor(id,color){return colorPhotoFor(id,color)||window.FAMILY_PHOTOS?.[id]||window.REAL_PHOTOS?.[id]||colorVariantFor(id,color);}
 function colorHex(c){const x=c.toLowerCase();if(x.includes('rosa'))return '#f3b5c7';if(x.includes('azul'))return '#5c82c9';if(x.includes('verde'))return '#8eaf9c';if(x.includes('roxo')||x.includes('lavanda'))return '#9c8bc4';if(x.includes('amarelo')||x.includes('dourado'))return '#d9bb67';if(x.includes('branco')||x.includes('prateado')||x.includes('estelar')||x.includes('glacial'))return '#f4f4f0';if(x.includes('vermelho')||x.includes('red'))return '#c8102e';if(x.includes('preto')||x.includes('grafite')||x.includes('espacial'))return '#222';if(x.includes('laranja'))return '#e56a22';if(x.includes('bordô'))return '#6b2737';return '#888';}
 window.addEventListener('DOMContentLoaded', function(){
  try {
@@ -50,7 +50,7 @@ window.addEventListener('DOMContentLoaded', function(){
    </section>`;
   const main=$("mainImage");
   const family=(window.FAMILY_PHOTOS&&window.FAMILY_PHOTOS[p.id])||(window.REAL_PHOTOS&&window.REAL_PHOTOS[p.id]);
-  const setColorPhoto=(color)=>{ const exact=colorPhotoFor(p.id,color); const src=exact||colorVariantFor(p.id,color)||family||fallback; if(main){ main.src=src; main.alt=`${p.name} ${color}`; main.style.objectPosition="50% center"; main.style.transform="none"; main.onerror=function(){this.onerror=null;this.src=fallback;}; } };
+  const setColorPhoto=(color)=>{ const exact=colorPhotoFor(p.id,color); const src=exact||window.FAMILY_PHOTOS?.[p.id]||family||colorVariantFor(p.id,color)||fallback; if(main){ main.src=src; main.alt=`${p.name} ${color}`; main.style.objectPosition=colorPositionFor(p.id,color)+' center'; main.style.objectFit='cover'; main.style.transform="none"; main.onerror=function(){this.onerror=null;this.src=fallback;}; } };
   setColorPhoto(selected);
   document.querySelectorAll('.photo-thumb').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.photo-thumb').forEach(x=>x.classList.remove('active'));b.classList.add('active');main.style.setProperty('--photo-image',`url("${b.dataset.src.replaceAll('\"','%22')}")`);main.style.setProperty('--photo-position','50%');main.style.setProperty('--color-count','1');}));
   document.querySelectorAll('.color-option').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.color-option').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');selected=b.dataset.color;$("selectedColor").textContent=selected;setColorPhoto(selected);document.querySelectorAll('.photo-thumb').forEach(x=>x.classList.remove('active'));$("continueBuy").href=`checkout.html?id=${encodeURIComponent(p.id)}&color=${encodeURIComponent(selected)}`;}));

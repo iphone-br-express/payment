@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: iphone-express-7bank
+    runtime: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PAYBR_CLIENT_ID
+        sync: false
+      - key: PAYBR_CLIENT_SECRET
+        sync: false
+      - key: PAYBR_API_URL
+        value: https://api-7bank.squareweb.app
+      - key: ALLOWED_ORIGIN
+        value: https://iphone-br-express.github.io

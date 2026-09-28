@@ -1,13 +1,9 @@
 {
-  "name": "iphone-express-backend",
-  "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "start": "node server.js"
-  },
-  "dependencies": {
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2"
-  }
+  "name":"iphone-express-7bank-render",
+  "version":"25.0.0",
+  "private":true,
+  "type":"commonjs",
+  "scripts":{"start":"node server.js"},
+  "engines":{"node":">=18"},
+  "dependencies":{"cors":"^2.8.5","dotenv":"^16.4.7","express":"^4.21.2"}
 }
