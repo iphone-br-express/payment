@@ -18,7 +18,75 @@ async function upstream(path,options={}){const controller=new AbortController();
 app.get('/api/health',(_req,res)=>res.json({ok:true,provider:'7Bank',apiUrl:API_URL,configured:Boolean(CLIENT_ID&&CLIENT_SECRET)}));
 app.get('/api/products',(_req,res)=>res.json({success:true,products:PRODUCTS.map(p=>({...p,colors:PRODUCT_COLORS[p.id]||[]}))}));
 app.get('/api/products/:id',(req,res)=>{const p=productById(req.params.id);if(!p)return res.status(404).json({message:'Produto não encontrado.'});res.json({success:true,product:{...p,colors:PRODUCT_COLORS[p.id]||[]}});});
-app.post('/api/deposit',async(req,res)=>{try{const {productId,color,description,payerName,payerDocument}=req.body||{};const product=productById(productId);if(!product)return res.status(400).json({code:'INVALID_PRODUCT',message:'Produto não encontrado.'});if(!color||!colorAllowed(productId,color))return res.status(400).json({code:'INVALID_COLOR',message:'Selecione uma cor disponível para este aparelho.'});if(!String(payerName||'').trim())return res.status(400).json({code:'INVALID_PAYER',message:'Nome do pagador é obrigatório.'});const document=String(payerDocument||'').replace(/\D/g,'');if(document.length!==11)return res.status(400).json({code:'INVALID_CPF',message:'CPF inválido.'});const body={amount:Number(product.price),description:String(description||`Venda ${product.name} ${product.storage} - ${color}`).slice(0,120),payerName:String(payerName).trim().slice(0,120),payerDocument:document};const {response,data}=await upstream('/api/v1/deposit',{method:'POST',body:JSON.stringify(body)});if(!response.ok||data?.success===false){console.error('7Bank deposit error',response.status,data);return res.status(409).json({code:'PRODUCT_UNAVAILABLE',message:'Produto esgotado'});}res.json(data);}catch(err){console.error('Deposit proxy error:',err);res.status(409).json({code:'PRODUCT_UNAVAILABLE',message:'Produto esgotado'});}});
+function providerMessage(data){
+  if(!data)return '';
+  return String(data.message||data.error||data.detail||data.reason||data.raw||'').trim();
+}
+function nestedStatus(message){
+  const m=String(message||'').match(/status\s*code\s*(\d{3})/i);
+  return m?Number(m[1]):null;
+}
+function classifyDepositError(status,data){
+  const detail=providerMessage(data);
+  const nested=nestedStatus(detail);
+  const raw=detail.toLowerCase();
+  if(status===400){
+    return {code:'PROVIDER_VALIDATION',message:'O gateway recusou os parâmetros enviados para gerar o PIX.',providerMessage:detail||'O gateway retornou 400 (Bad Request): parâmetros inválidos ou campos obrigatórios ausentes.',providerStatus:status};
+  }
+  if(status===401){
+    return {code:'PROVIDER_UNAUTHORIZED',message:'O gateway recusou as credenciais da integração (401). Verifique o Client ID e Client Secret no Render.',providerMessage:detail||'Unauthorized',providerStatus:status};
+  }
+  if(status===403){
+    return {code:'PROVIDER_FORBIDDEN',message:'O gateway recusou a operação (403). A documentação informa conta bloqueada ou IP não autorizado.',providerMessage:detail||'Forbidden',providerStatus:status};
+  }
+  if(status===402){
+    return {code:'PROVIDER_PAYMENT_REQUIRED',message:'O gateway informou saldo insuficiente para a operação.',providerMessage:detail||'Payment Required',providerStatus:status};
+  }
+  if(status===404){
+    return {code:'PROVIDER_NOT_FOUND',message:'O recurso solicitado não foi encontrado no gateway.',providerMessage:detail||'Not Found',providerStatus:status};
+  }
+  if(status===409){
+    const availability=/esgotad|indispon|sem estoque|out of stock|unavailable/i.test(raw);
+    return availability
+      ? {code:'PROVIDER_UNAVAILABLE',message:'O gateway informou que a operação está indisponível no momento.',providerMessage:detail,providerStatus:status}
+      : {code:'PROVIDER_CONFLICT',message:'O gateway recusou esta nova cobrança (409). Tente iniciar um novo pedido.',providerMessage:detail,providerStatus:status};
+  }
+  if(status===429){
+    return {code:'PROVIDER_RATE_LIMIT',message:'O gateway recebeu muitas tentativas. Aguarde alguns segundos e tente novamente.',providerMessage:detail||'Too Many Requests',providerStatus:status};
+  }
+  if(status>=500){
+    const suffix=nested===400?' O próprio gateway informou internamente uma falha com status 400; isso não confirma limite de valor.':nested?' O gateway informou internamente outro status de falha ('+nested+').':'';
+    return {code:'PROVIDER_ERROR',message:'O gateway retornou erro interno (HTTP '+status+').'+suffix,providerMessage:detail||'Internal Error',providerStatus:status,nestedStatus:nested||undefined};
+  }
+  return {code:'PROVIDER_ERROR',message:'O gateway não aceitou a solicitação de PIX (HTTP '+status+').',providerMessage:detail,providerStatus:status};
+}
+app.post('/api/deposit',async(req,res)=>{
+  const requestId=`dep_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+  try{
+    const {productId,color,description,payerName,payerDocument}=req.body||{};
+    const product=productById(productId);
+    if(!product)return res.status(400).json({code:'INVALID_PRODUCT',message:'Produto não encontrado.',requestId});
+    if(!color||!colorAllowed(productId,color))return res.status(400).json({code:'INVALID_COLOR',message:'Selecione uma cor disponível para este aparelho.',requestId});
+    if(!String(payerName||'').trim())return res.status(400).json({code:'INVALID_PAYER',message:'Nome do pagador é obrigatório.',requestId});
+    const document=String(payerDocument||'').replace(/\D/g,'');
+    if(document.length!==11)return res.status(400).json({code:'INVALID_CPF',message:'CPF inválido.',requestId});
+    const uniqueDescription=String(description||`Venda ${product.name} ${product.storage} - ${color}`).slice(0,92)+` #${Date.now().toString().slice(-8)}`;
+    const body={amount:Number(product.price),description:uniqueDescription.slice(0,120),payerName:String(payerName).trim().slice(0,120),payerDocument:document};
+    console.log('[deposit]',requestId,{productId,color,amount:body.amount,payerDocument:'***',description:body.description});
+    const {response,data}=await upstream('/api/v1/deposit',{method:'POST',body:JSON.stringify(body)});
+    if(!response.ok||data?.success===false){
+      console.error('[7Bank deposit error]',requestId,'HTTP',response.status,JSON.stringify(data));
+      const err=classifyDepositError(response.status,data);
+      return res.status(response.status>=400&&response.status<600?response.status:502) .json({...err,requestId,providerStatus:response.status});
+    }
+    console.log('[deposit success]',requestId,'HTTP',response.status,'transactionId',data?.transactionId||data?.transaction?.transactionId||data?.transaction?.id||null);
+    res.json({...data,requestId});
+  }catch(err){
+    console.error('[Deposit proxy exception]',requestId,err?.stack||err);
+    const timeout=err?.name==='AbortError';
+    res.status(502).json({code:timeout?'PROVIDER_TIMEOUT':'PROXY_ERROR',message:timeout?'O gateway demorou para responder. Tente novamente.':'Não foi possível falar com o gateway de pagamento. Tente novamente.',requestId});
+  }
+});
 app.get('/api/transactions/check',async(req,res)=>{try{const transactionId=String(req.query.transactionId||'').trim();if(!transactionId)return res.status(400).json({message:'transactionId é obrigatório.'});const {response,data}=await upstream('/api/transactions/check?transactionId='+encodeURIComponent(transactionId),{method:'GET'});if(!response.ok)return res.status(response.status).json(data);res.json(data);}catch(err){res.status(502).json({message:'Não foi possível consultar o status da transação.'});}});
 app.get('/api/balance',async(_req,res)=>{try{const {response,data}=await upstream('/api/v1/balance',{method:'GET'});res.status(response.status).json(data);}catch(err){res.status(502).json({message:'Não foi possível consultar o saldo.'});}});
 app.post('/api/withdraw',async(req,res)=>{try{const {amount,pixKey,pixKeyType,description}=req.body||{};if(!amount||!pixKey||!pixKeyType)return res.status(400).json({message:'amount, pixKey e pixKeyType são obrigatórios.'});const {response,data}=await upstream('/api/v1/withdraw',{method:'POST',body:JSON.stringify({amount:Number(amount),pixKey:String(pixKey).trim(),pixKeyType:String(pixKeyType),description:String(description||'').trim()})});res.status(response.status).json(data);}catch(err){res.status(502).json({message:'Não foi possível realizar a transferência.'});}});

@@ -1,13 +1,31 @@
-# iPhone Express — 7Bank / Render
+# iPhone Express V28 — 7Bank
 
-Frontend: publique o conteúdo de `frontend/` no GitHub Pages.
+V28 é baseada na V27 e adiciona diagnóstico detalhado dos erros do gateway.
 
-Render: Root Directory `server`; Build `npm install`; Start `npm start`.
+## Diagnóstico de depósitos
+- O Render preserva o HTTP status retornado pelo 7Bank.
+- O log `[7Bank deposit error]` mostra requestId, status HTTP e corpo retornado pelo gateway.
+- O Client Secret nunca é impresso e o CPF é mascarado.
+- Erros 400, 401, 402, 403, 404, 409, 429 e 5xx recebem códigos distintos.
+- Se o gateway retornar HTTP 500 com uma mensagem como `Request failed with status code 400`, o sistema identifica o status interno 400, mas não o trata como limite de valor sem evidência.
+- A mensagem original retornada pelo gateway (`providerMessage`) é enviada ao frontend para facilitar o diagnóstico.
+- “Produto esgotado” não é usado para erros genéricos de API.
 
-Environment Variables:
-- PAYBR_CLIENT_ID = live_841e2f45b561386f4cc4b4dabcdd84b0
-- PAYBR_CLIENT_SECRET = coloque o secret atual do 7Bank no Render; não coloque no GitHub
-- PAYBR_API_URL = https://api-7bank.squareweb.app
-- ALLOWED_ORIGIN = https://iphone-br-express.github.io
+## Depósito
+O backend envia exatamente os quatro campos documentados pelo 7Bank:
+`amount`, `description`, `payerName`, `payerDocument`. O valor vem do catálogo no servidor.
 
-O backend envia ao 7Bank somente `amount`, `description`, `payerName`, `payerDocument`, usando os headers obrigatórios. O preço é resolvido no backend pelo productId. Falha do Cash-In retorna `Produto esgotado` ao frontend.
+## Render
+Configure:
+- `PAYBR_CLIENT_ID`
+- `PAYBR_CLIENT_SECRET`
+- `PAYBR_API_URL=https://api-7bank.squareweb.app`
+- `ALLOWED_ORIGIN=https://iphone-br-express.github.io`
+
+Nunca coloque o Client Secret no GitHub Pages.
+
+## Teste seguro
+Depois do deploy, faça uma única tentativa com um produto que falha. Abra Render → Logs e procure `[7Bank deposit error]`. Envie apenas a linha do erro para diagnóstico; nunca envie credenciais.
+
+## Imagens
+Checkout e pagamento usam `object-fit: contain` para evitar recortes.
